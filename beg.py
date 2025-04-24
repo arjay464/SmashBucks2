@@ -4,9 +4,11 @@ import time
 import balance
 import flavor
 import random
+import os
+import math
 
 config = configparser.ConfigParser()
-BegFilePath = "/home/pendleton/PycharmProjects/SmashBucks2/.venv/files/beg.ini"
+BegFilePath = f"{os.getcwd()}/files/beg.ini"
 
 
 async def init_user_beg(username: str) -> None:
@@ -33,9 +35,10 @@ async def beg(message: discord.Message) -> str:
     current_time = time.mktime(now)
     config[username]['num_uses'] = str(num_uses + 1)
     config[username]['unix_beg_time'] = str(current_time)
-    print(username)
+    print(f"{username} has now begged {int(num_uses) + 1} times")
     with open(BegFilePath, 'w') as f:
         config.write(f)
+    config.clear()
     if current_time - last_beg > 300:
         if random.randint(1, 100) == 100:
             crit_reward = random.randint(21, 40)
@@ -60,10 +63,15 @@ async def beg(message: discord.Message) -> str:
                 else:
                     output = await flavor.get_beg_rejections_general()
                     return output
-    else:
-        return "Wait please :)"
-
-
+    minutes = math.floor((current_time - last_beg) % 60)
+    seconds = math.floor(current_time)
+    z_mod_m = ""
+    z_mod_s = ""
+    if minutes < 10:
+        z_mod_m = "0"
+    if seconds < 10:
+        z_mod_s = "0"
+    return f"Please wait :) ({z_mod_m}{minutes}:{z_mod_s}{seconds} remaining)"
 
 
 

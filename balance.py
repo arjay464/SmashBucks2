@@ -9,6 +9,7 @@ async def initUserBalance(username: str) -> None:
     config['Balance'][username] = "100"
     with open(BalanceFilePath, "w") as configfile:
         config.write(configfile)
+    config.clear()
 
 
 async def addBalance(username: str, balance: int, name: str) -> str:
@@ -23,9 +24,9 @@ async def addBalance(username: str, balance: int, name: str) -> str:
             config['Balance'][username] = str(new_balance)
             with open(BalanceFilePath, 'w') as configfile:
                 config.write(configfile)
+            config.clear()
             return "Gave "+str(username)+" "+str(balance)+"\nBalance: "+str(current_balance)+" -> "+str(new_balance)
         else:
-            print(str(username))
             return "User: "+str(username)+" not found"
     else:
         return "Access Denied"
@@ -43,10 +44,10 @@ async def subBalance(username: str, balance: int, name: str) -> str:
             config['Balance'][username] = str(new_balance)
             with open(BalanceFilePath, 'w') as configfile:
                 config.write(configfile)
+            config.clear()
             return "Revoked " + str(balance) + " from " + str(username) + "\nBalance: " + str(current_balance) + " -> " + str(
                 new_balance)
         else:
-            print(str(username))
             return "User: " + str(username) + " not found"
     else:
         return "Access Denied"
@@ -63,10 +64,10 @@ async def botSubBalance(username: str, balance: int) -> str:
         config['Balance'][username] = str(new_balance)
         with open(BalanceFilePath, 'w') as configfile:
             config.write(configfile)
+        config.clear()
         return "Revoked " + str(balance) + " from " + str(username) + "\nBalance: " + str(current_balance) + " -> " + str(
             new_balance)
     else:
-        print(str(username))
         return "User: " + str(username) + " not found"
 
 
@@ -81,9 +82,9 @@ async def botAddBalance(username: str, balance: int) -> str:
         config['Balance'][username] = str(new_balance)
         with open(BalanceFilePath, 'w') as configfile:
             config.write(configfile)
+        config.clear()
         return "Gave "+str(username)+" "+str(balance)+"\nBalance: "+str(current_balance)+" -> "+str(new_balance)
     else:
-        print(str(username))
         return "User: "+str(username)+" not found"
 
 

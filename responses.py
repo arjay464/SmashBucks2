@@ -1,17 +1,27 @@
 import re
+import time
+import os
 import balance
 import formatting
 import flavor
 import beg
 import configparser
 import daily
+import potato
+import math
+import game_actions
+from mail import Mail
 
 config = configparser.ConfigParser()
-InventoryFilePath = "/home/pendleton/PycharmProjects/SmashBucks2/.venv/files/inventory.ini"
-PuzzleFilePath = "/home/pendleton/PycharmProjects/SmashBucks2/.venv/files/puzzle.ini"
+InventoryFilePath = f"{os.getcwd()}/files/inventory.ini"
+PuzzleFilePath = f"{os.getcwd()}/files/puzzle.ini"
+mapFilePath = f"{os.getcwd()}/map/map.png"
+PotatoFilePath = f"{os.getcwd()}/files/potato.ini"
+InitFilePath = f"{os.getcwd()}/files/init.ini"
+lit_potato = None
 
-
-async def handleResponse(message):
+async def handleResponse(message, smashbucks):
+    global lit_potato
     text = message.content
     username = message.author.name
     id = message.author.id
@@ -45,11 +55,11 @@ async def handleResponse(message):
         return output
 
     if text == "%help":
-        return "%beg\n%balance\n%gacha\n%sell\n%inventory\n%prices\n%power\n%rarity\n%puzzle"
+        return "https://docs.google.com/document/d/1PjgFQvvWEgWCSmILofrdzbbeOGSSzPWwJpwN-huRIHk/edit?usp=sharing"
 
     if text == "%random_card":
         if username == "arjay_tg" or username == "_camden":
-            card_id = await formatting.card_shuffler()
+            card_id = await formatting.card_shuffler(username)
             file_path = await formatting.display_card(card_id)
             await formatting.output_card(file_path, message.channel)
             return
@@ -59,25 +69,21 @@ async def handleResponse(message):
     if text == "%gacha":
         current_balance = await balance.userBalance(message.author.name)
         if current_balance >= 20:
-            output = await balance.botSubBalance(message.author.name, 20)
-            card_id = await formatting.card_shuffler()
+            card_id = await formatting.card_shuffler(username)
             file_path = await formatting.display_card(card_id)
             await formatting.output_card(file_path, message.channel)
             config.read(InventoryFilePath)
             cards = []
             for key, value in config.items(username):
                 cards.append(key)
-            print(cards)
-            print(card_id)
-            print(str(card_id) in cards)
             if str(card_id) in cards:
-                print("found")
                 config[username][str(card_id)] = str(config.getint(username, str(card_id)) + 1)
             else:
                 config[username][str(card_id)] = "1"
             with open(InventoryFilePath, "w") as configfile:
                 config.write(configfile)
-                config.clear()
+            config.clear()
+            output = await balance.botSubBalance(message.author.name, 20)
             return output
         else:
             return "Insufficient Funds"
@@ -86,8 +92,7 @@ async def handleResponse(message):
         config.read(InventoryFilePath)
         cards = []
         for key, value in config.items(username):
-            name = await formatting.get_card_name(int(key))
-            name.replace("_", "'")
+            name = await formatting.get_inventory_display_name(int(key))
             if int(value) > 1:
                 cards.append(name + " x"+value)
             else:
@@ -99,7 +104,8 @@ async def handleResponse(message):
     if re.search("%sell*", text):
         text.replace("'", "_")
         text = text.replace("%sell ", "")
-        text = text.upper()
+        text = text.lower()
+        text = await formatting.normalize_card_name(text)
         card_id = await formatting.name_to_id(text)
         config.read(InventoryFilePath)
         try:
@@ -110,7 +116,7 @@ async def handleResponse(message):
                 config.remove_option(username, str(card_id))
             with open(InventoryFilePath, "w") as configfile:
                 config.write(configfile)
-                config.clear()
+            config.clear()
         except Exception as e:
             print(e)
             return "Card not found in inventory."
@@ -134,15 +140,38 @@ async def handleResponse(message):
             output = await balance.botAddBalance(message.author.name, 1000)
             return output
         elif card_rarity == "Artifact":
-            return "It is unwise to sell such a priceless item.\n-Someone Wise, probably"
+            output = await balance.botAddBalance(message.author.name, 750)
+            return output
+        elif card_rarity == "Holo_Common":
+            output = await balance.botAddBalance(message.author.name, 28)
+            return output
+        elif card_rarity == "Holo_Uncommon":
+            output = await balance.botAddBalance(message.author.name, 72)
+            return output
+        elif card_rarity == "Holo_Rare":
+            output = await balance.botAddBalance(message.author.name, 160)
+            return output
+        elif card_rarity == "Holo_Epic":
+            output = await balance.botAddBalance(message.author.name, 400)
+            return output
+        elif card_rarity == "Holo_Ultimate":
+            output = await balance.botAddBalance(message.author.name, 1000)
+            return output
+        elif card_rarity == "Holo_Mythic":
+            output = await balance.botAddBalance(message.author.name, 4000)
+            return output
+        elif card_rarity == "Holo_Artifact":
+            output = await balance.botAddBalance(message.author.name, 3000)
+            return output
 
     if text == "%prices":
-        return "COMMON: 7 Smashbucks\nUNCOMMON: 18 Smashbucks\nRARE: 40 Smashbucks\nEPIC: 100 Smashbucks\nULTIMATE: 250 Smashbucks\nMYTHIC: 1000 Smashbucks"
+        return "COMMON: 7 Smashbucks\nUNCOMMON: 18 Smashbucks\nRARE: 40 Smashbucks\nEPIC: 100 Smashbucks\nULTIMATE: 250 Smashbucks\nARTIFCAT: 750 Smashbucks\nMYTHIC: 1000 Smashbucks\nHOLO x4"
 
     if re.search("%view*", text):
         text.replace("'", "_")
         text = text.replace("%view ", "")
-        text = text.upper()
+        text = text.lower()
+        text = await formatting.normalize_card_name(text)
         card_id = await formatting.name_to_id(text)
         config.read(InventoryFilePath)
         try:
@@ -165,37 +194,20 @@ async def handleResponse(message):
             else:
                 cards.append(await formatting.get_card_name(int(key)))
         total_power = 0
-        print(cards)
         for card in cards:
             total_power += await formatting.get_card_power(card)
         config.clear()
         return "You have "+str(total_power)+" SmashBucks Power."
 
     if text == "%rarity":
-        return "COMMON: 70%\nUNCOMMON: 20%\nRARE: 7%\nEPIC: 2%\nULTIMATE: 0.9%\nMYTHIC: 0.1%"
+        return "COMMON: 69.4%\nUNCOMMON: 20%\nRARE: 7%\nEPIC: 2%\nULTIMATE: 0.9%\nARTIFACT: 0.6%\nMYTHIC: 0.1%"
 
     if text == "%daily":
         output = await daily.daily(username)
         return output
 
     if text == "%puzzle":
-        return "There are no currently active puzzles."
-    if text == "%taskmaster":
-        config.read(PuzzleFilePath)
-        if config.getboolean("Shard of Taskmaster", "completed"):
-            return "Puzzle has already been completed."
-        else:
-            config["Shard of Taskmaster"]["completed"] = "1"
-            with open(PuzzleFilePath, "w") as configfile:
-                config.write(configfile)
-            config.clear()
-            file_path = await formatting.display_card(122)
-            await formatting.output_card(file_path, message.channel)
-            config.read(InventoryFilePath)
-            config[username]["122"] = "1"
-            with open(InventoryFilePath, "w") as configfile:
-                config.write(configfile)
-            return "The fair arbiter's words held true. Taskmaster's essence, his residual malice, now lies in your possesion."
+        return "Checking the reason polling gives you cause for concern. 33.8% of the vote...\nYou'll lose in a landslide. Your map lies face up on the desk. Redraw...?\nPerhaps but you could only be so bold...\nYou'd need to make the districts the same size as one another, and they'd need to all be contiguous, surely no enclaves, diagonals or ties...\nThere's only 4 districts now... you could probably get away with changing that...\nCould purple actually become victorious? Currently, you wouldn't even win a single district.\n\nA faint whisper from the heavens:\n\n*DM me (not SmashBucks 2) a winning map*\n*And you'll need the map on your desk* \n*%map*\n\n(Puzzle uploaded 12/3/2024 @ 11:31 pm)"
 
     if text == "%leaderboard":
         config.read(InventoryFilePath)
@@ -227,51 +239,128 @@ async def handleResponse(message):
         output = '\n'.join(placement)
         return output
 
-    if text == "%tome_of_inquisition":
-        config.read(PuzzleFilePath)
-        if config.getboolean("Tome of Inquisition", "completed"):
-            return "Puzzle has already been completed."
+    if text == "%opt in":
+        config.read(PotatoFilePath)
+        if await balance.userBalance(username) <= 0:
+            return "You may not opt-in without any SmashBucks."
+        if config.has_section(username):
+            return "You are already opted in."
+        return await potato.potato_opt_in(username)
+
+    if text == "%opt out":
+        config.read(PotatoFilePath)
+        if config.getint('Setup', 'active') == 1:
+            return f"You may not opt-out while someone is holding a live potato."
+        if not config.has_section(username):
+            return f"You are already opted out."
+        return await potato.potato_opt_out(username)
+
+    if text == "%create potato":
+
+        enlarger = False
+        holo_enlarger = False
+
+        config.read(InventoryFilePath)
+
+        for key in config.items(username):
+            if key[0] == "122":
+                enlarger = True
+            if key[0] == "1122":
+                holo_enlarger = True
+                enlarger = False
+                break
+
+        if enlarger:
+            damage = 1000
+        elif holo_enlarger:
+            damage = 1500
         else:
-            config["Tome of Inquisition"]["completed"] = "1"
-            with open(PuzzleFilePath, "w") as configfile:
-                config.write(configfile)
-            config.clear()
-            file_path = await formatting.display_card(123)
-            await formatting.output_card(file_path, message.channel)
-            config.read(InventoryFilePath)
-            config[username]["123"] = "1"
-            with open(InventoryFilePath, "w") as cfile:
-                config.write(cfile)
-            return "The secrets of creation sparkle at your fingertips. Now if only you could read the ancient tongue."
+            damage = 500
 
-    if re.search('%gen_truth_table "*', text):
-        text = text[18:-1]
-        if 'z' in text:
-            rows = [ [0]*8 for i in range(8)]
-            x = [0,0,0,0,1,1,1,1]
-            y = [0,0,1,1,0,0,1,1]
-            z = [0,1,0,1,0,1,0,1]
-            for i in range(8):
-                rows[i].append(x[i])
-                rows[i].append(y[i])
-                rows[i].append(z[i])
-            print(rows)
+        config.clear()
 
+        config.read(PotatoFilePath)
 
+        now = time.gmtime()
+        current_time = time.mktime(now)
 
+        if current_time < config.getfloat('Setup', 'lockout'):
+            time_remaining = config.getfloat('Setup', 'lockout') - current_time
+            hours = math.floor(time_remaining / 3600)
+            time_remaining = time_remaining % 3600
+            minutes = math.floor(time_remaining / 60)
+            seconds = int(time_remaining % 60)
+            z_mod_h = ""
+            z_mod_m = ""
+            z_mod_s = ""
+            if hours < 10:
+                z_mod_h = "0"
+            if minutes < 10:
+                z_mod_m = "0"
+            if seconds < 10:
+                z_mod_s = "0"
+            return f"Cannot spawn a potato during the lockout period. ({z_mod_h}{hours}:{z_mod_m}{minutes}:{z_mod_s}{seconds} remaining)"
 
+        if config.get('Setup', 'active') == 1:
+            return "Cannot spawn potato while one is already active."
 
+        lit_potato = potato.Potato(username, smashbucks, damage)
+        return f"{username} is now holding a live potato."
 
+    if re.search("%pass", text):
+        target = text.replace("%pass ", "")
+        target = await formatting.formatId(target)
 
+        config.read(PotatoFilePath)
 
+        if config.getint('Users', username) == 0:
+            return "You cannot pass a potato when you aren't holding one."
 
+        if config.getint('Users', target) == 1:
+            return "Target is already holding a potato."
 
+        if config.getint(username, "8") == 1:
+            return "You are currently blackmailed!"
 
+        for key, value in config.items('Users'):
+            print(f"{key}: {value}")
+            if key == target and int(value) == 0:
+                try:
+                    if config.getint(target, "7") == 1:
+                        Mail(target, smashbucks)
+                    return await lit_potato.pass_potato(target, username)
 
+                except Exception as e:
+                    print(f"Error: {e}")
+        return "Target not among valid targets"
 
+    if text == "%summon":
+        return await game_actions.summon(username)
 
+    if text == "%blink":
+        return await game_actions.blink(username, smashbucks)
 
+    if text == "%split":
+        return await game_actions.split(username)
 
+    if text == "%discover":
+        return await game_actions.discover(username, lit_potato)
 
+    if text == "%blackmail":
+        return await game_actions.blackmail(username, smashbucks, lit_potato)
 
+    if text == "%targets":
+        config.read(PotatoFilePath)
+        targets = []
+        for section in config.sections():
+            if not (section == "Users" or section == "Setup"):
+                targets.append(section)
+        if not targets:
+            return "No one is currently opted in."
+        return "Targets:\n"+"\n".join(targets)
 
+    if text == "%uses":
+        config.read(InitFilePath)
+        uses = config.getint("init", "num_uses")
+        uses = "{:,}".format(uses)
+        return f"I've answered {uses} commands."
