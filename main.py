@@ -2,9 +2,10 @@ import discord
 import configparser
 import bot
 import asyncio
+import os
 
 config = configparser.ConfigParser()
-InitFilePath = "/home/pendleton/PycharmProjects/SmashBucks2/.venv/files/init.ini"
+InitFilePath = f"{os.getcwd()}/files/init.ini"
 config.read(InitFilePath)
 smashbucks_id = config.getint("init", "smashbucks_id")
 token = config.get("init", "token")

@@ -2,12 +2,12 @@ import discord
 import configparser
 import responses
 import balance
-import threading
+import os
 
 config = configparser.ConfigParser()
-ClientListFilePath = "/home/pendleton/PycharmProjects/SmashBucks2/.venv/files/client_list.ini"
-InventoryFilePath = "/home/pendleton/PycharmProjects/SmashBucks2/.venv/files/inventory.ini"
-InitFilePath = "/home/pendleton/PycharmProjects/SmashBucks2/.venv/files/init.ini"
+ClientListFilePath = f"{os.getcwd()}/files/client_list.ini"
+InventoryFilePath = f"{os.getcwd()}/files/inventory.ini"
+InitFilePath = f"{os.getcwd()}/files/init.ini"
 
 
 async def output_message(message, smashbucks):
